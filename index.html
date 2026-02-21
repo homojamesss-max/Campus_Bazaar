@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CAMPUS BAZAAR | HISTORY RESTORED</title>
+    <title>CAMPUS BAZAAR | COMPLETE</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
@@ -11,30 +11,58 @@
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
         :root { --accent: #3b82f6; --bg: #0b0f1a; --card: #161b2a; }
-        body { background-color: var(--bg); color: #f8fafc; font-family: 'Plus Jakarta Sans', sans-serif; }
+        body { background-color: var(--bg); color: #f8fafc; font-family: 'Plus Jakarta Sans', sans-serif; overflow-x: hidden; }
         .glass-nav { background: rgba(11, 15, 26, 0.8); backdrop-filter: blur(20px); border-bottom: 1px solid rgba(255, 255, 255, 0.05); }
-        .card { background: var(--card); border: 1px solid rgba(255, 255, 255, 0.05); transition: 0.3s; }
-        .btn-action { background: var(--accent); color: white; font-weight: 700; border-radius: 12px; transition: 0.2s; }
-        .status-pill { padding: 4px 12px; border-radius: 20px; font-size: 11px; font-weight: 700; }
+        .card { background: var(--card); border: 1px solid rgba(255, 255, 255, 0.05); transition: all 0.3s ease; }
+        .card:hover { border-color: rgba(59, 130, 246, 0.4); transform: translateY(-4px); }
+        .btn-action { background: var(--accent); color: white; font-weight: 700; border-radius: 12px; transition: all 0.2s; }
+        .modal-blur { backdrop-filter: blur(8px); background: rgba(2, 6, 23, 0.85); }
+        input[type="number"]::-webkit-inner-spin-button { display: none; }
     </style>
 </head>
 <body onload="initApp()">
 
+    <div id="auth-screen" class="fixed inset-0 z-[200] bg-[#0b0f1a] flex items-center justify-center p-6 hidden">
+        <div class="card p-10 rounded-[2.5rem] max-w-md w-full text-center">
+            <div class="w-16 h-16 bg-blue-600 rounded-2xl mx-auto mb-6 flex items-center justify-center shadow-lg">
+                <i class="fa fa-graduation-cap text-2xl text-white"></i>
+            </div>
+            <div id="auth-form-content"></div>
+        </div>
+    </div>
+
     <nav id="main-nav" class="glass-nav px-4 md:px-8 py-4 sticky top-0 z-50 hidden">
         <div class="max-w-7xl mx-auto flex items-center justify-between gap-4">
             <div class="flex items-center gap-3 cursor-pointer" onclick="renderHome()">
-                <div class="w-9 h-9 bg-blue-600 rounded-xl flex items-center justify-center"><i class="fa fa-shop text-white"></i></div>
-                <span class="font-extrabold text-lg text-white">CAMPUS<span class="text-blue-500">BAZAAR</span></span>
+                <div class="w-9 h-9 bg-blue-600 rounded-xl flex items-center justify-center">
+                    <i class="fa fa-shop text-white text-sm"></i>
+                </div>
+                <span class="font-extrabold text-lg tracking-tighter text-white">CAMPUS<span class="text-blue-500">BAZAAR</span></span>
             </div>
-            <button onclick="logout()" class="text-red-500 bg-red-500/10 w-9 h-9 rounded-xl"><i class="fa fa-power-off"></i></button>
+            <div class="flex items-center gap-4">
+                <div class="text-right hidden sm:block">
+                    <p id="user-display" class="text-xs font-bold text-white"></p>
+                    <p class="text-[10px] text-blue-500 font-bold uppercase">Active Member</p>
+                </div>
+                <button onclick="logout()" class="w-9 h-9 flex items-center justify-center rounded-xl bg-red-500/10 text-red-500 hover:bg-red-500 transition">
+                    <i class="fa fa-arrow-right-from-bracket text-xs"></i>
+                </button>
+            </div>
         </div>
     </nav>
 
-    <main id="main-content" class="max-w-7xl mx-auto p-6 min-h-screen"></main>
+    <main id="main-content" class="max-w-7xl mx-auto p-4 md:p-8 min-h-screen"></main>
+
+    <div id="modal" class="fixed inset-0 modal-blur hidden items-center justify-center z-[100] p-4" onclick="if(event.target === this) closeModal()">
+        <div class="card p-8 rounded-[2rem] max-w-lg w-full relative max-h-[90vh] overflow-y-auto">
+            <button onclick="closeModal()" class="absolute top-6 right-8 text-gray-500 hover:text-white transition text-2xl">&times;</button>
+            <div id="modal-body"></div>
+        </div>
+    </div>
 
     <script>
-        // --- FIREBASE CONFIG ---
-        const firebaseConfig = {
+        // --- FIREBASE CONFIGURATION ---
+       const firebaseConfig = {
             apiKey: "AIzaSyD_tgOiJXN6ITjRgBQEWfA2CtRKmeWV0OQ",
             authDomain: "bazaar-d968d.firebaseapp.com",
             projectId: "bazaar-d968d",
@@ -47,128 +75,285 @@
         const db = firebase.firestore();
         let currentUser = JSON.parse(sessionStorage.getItem('cb_session')) || null;
 
+        // --- APP INITIALIZATION ---
         function initApp() {
-            if (!currentUser) { /* Auth logic here */ } 
-            else {
+            if (!currentUser) {
+                showLogin();
+            } else {
+                document.getElementById('auth-screen').classList.add('hidden');
                 document.getElementById('main-nav').classList.remove('hidden');
+                document.getElementById('user-display').innerText = currentUser.username.toUpperCase();
                 renderHome();
             }
         }
 
+        // --- AUTHENTICATION LOGIC ---
+        function showLogin() {
+            document.getElementById('auth-screen').classList.remove('hidden');
+            document.getElementById('auth-form-content').innerHTML = `
+                <h2 class="text-2xl font-bold mb-1">Student Login</h2>
+                <p class="text-gray-500 text-xs mb-8">Enter your campus trade credentials</p>
+                <div class="space-y-3 text-left">
+                    <input type="text" id="loginUser" placeholder="Username" class="w-full bg-white/5 border border-white/10 p-4 rounded-xl text-white outline-none focus:border-blue-500">
+                    <input type="password" id="loginPass" placeholder="Password" class="w-full bg-white/5 border border-white/10 p-4 rounded-xl text-white outline-none focus:border-blue-500">
+                    <button onclick="handleLogin()" class="w-full btn-action py-4 mt-2">ACCESS BAZAAR</button>
+                    <p class="text-center text-[11px] text-gray-500 mt-4">New here? <span onclick="showRegister()" class="text-blue-500 cursor-pointer font-bold">Register</span></p>
+                </div>`;
+        }
+
+        function showRegister() {
+            document.getElementById('auth-form-content').innerHTML = `
+                <h2 class="text-2xl font-bold mb-1">Join the Hub</h2>
+                <p class="text-gray-500 text-xs mb-8">Choose your role to get started</p>
+                <div class="space-y-3 text-left">
+                    <input type="text" id="regUser" placeholder="Username" class="w-full bg-white/5 border border-white/10 p-4 rounded-xl text-white outline-none">
+                    <input type="password" id="regPass" placeholder="Password" class="w-full bg-white/5 border border-white/10 p-4 rounded-xl text-white outline-none">
+                    <select id="regRole" class="w-full bg-white/5 border border-white/10 p-4 rounded-xl text-gray-400 outline-none">
+                        <option value="buyer">I want to Buy</option>
+                        <option value="seller">I want to Sell</option>
+                    </select>
+                    <button onclick="handleRegister()" class="w-full btn-action py-4 mt-2">CREATE ACCOUNT</button>
+                    <p class="text-center text-[11px] text-gray-500 mt-4">Already a member? <span onclick="showLogin()" class="text-blue-500 cursor-pointer font-bold">Sign In</span></p>
+                </div>`;
+        }
+
+        async function handleLogin() {
+            const u = document.getElementById('loginUser').value;
+            const p = document.getElementById('loginPass').value;
+            const snap = await db.collection('users').where('username', '==', u).where('password', '==', p).get();
+            if(!snap.empty) {
+                const user = snap.docs[0].data();
+                sessionStorage.setItem('cb_session', JSON.stringify(user));
+                location.reload();
+            } else alert("Invalid credentials.");
+        }
+
+        async function handleRegister() {
+            const u = document.getElementById('regUser').value, p = document.getElementById('regPass').value, r = document.getElementById('regRole').value;
+            if(!u || !p) return alert("All fields required.");
+            await db.collection('users').add({ username: u, password: p, role: r });
+            alert("Registered! Please login.");
+            showLogin();
+        }
+
+        function logout() { sessionStorage.removeItem('cb_session'); location.reload(); }
         function renderHome() { currentUser.role === 'buyer' ? renderBuyerShop() : renderSellerHub(); }
 
-        // --- BUYER HISTORY & RECEIVE ---
-        async function renderBuyerOrders() {
+        // --- BUYER SHOP ---
+        async function renderBuyerShop() {
             const container = document.getElementById('main-content');
             container.innerHTML = `
-                <div class="flex items-center gap-4 mb-6">
-                    <button onclick="renderBuyerShop()" class="text-blue-500"><i class="fa fa-arrow-left"></i></button>
-                    <h2 class="font-bold">Active Orders</h2>
+                <div class="flex items-center justify-between mb-8">
+                    <div><h1 class="text-2xl font-extrabold">Marketplace</h1><p class="text-[11px] text-blue-500 font-bold uppercase tracking-widest">Live Campus Feed</p></div>
+                    <div class="flex bg-white/5 p-1 rounded-xl">
+                        <button onclick="renderBuyerOrders()" class="px-4 py-2 text-[10px] font-bold text-gray-400 hover:text-white uppercase">Orders</button>
+                        <button onclick="renderBuyerHistory()" class="px-4 py-2 text-[10px] font-bold text-gray-400 hover:text-white uppercase">History</button>
+                    </div>
                 </div>
-                <div id="order-list" class="space-y-3"></div>
-                <button onclick="renderBuyerHistory()" class="mt-8 text-[10px] font-bold text-gray-500 uppercase tracking-widest hover:text-white transition">View Purchase Archive</button>`;
+                <div id="grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5"></div>`;
             
-            const snap = await db.collection('orders').where('buyer', '==', currentUser.username).get();
-            const list = document.getElementById('order-list');
-
-            if (snap.empty) list.innerHTML = `<p class="text-gray-600 text-sm">No current orders.</p>`;
-
+            const snap = await db.collection('products').get();
+            const grid = document.getElementById('grid');
             snap.forEach(doc => {
-                const o = doc.data();
-                list.innerHTML += `
-                    <div class="card p-4 rounded-xl flex justify-between items-center">
-                        <div class="flex items-center gap-4">
-                            <img src="${o.itemImg}" class="w-10 h-10 rounded-lg object-cover">
-                            <div><p class="text-sm font-bold text-white">${o.itemName}</p><p class="text-[10px] text-blue-500 uppercase">${o.status}</p></div>
-                        </div>
-                        ${o.status === 'On the Way' ? 
-                            `<button onclick="confirmReceived('${doc.id}')" class="bg-emerald-500 text-white px-4 py-2 rounded-lg text-[10px] font-bold uppercase">Receive</button>` : 
-                            `<span class="text-[10px] font-bold text-gray-500 uppercase">Awaiting Shipping</span>`
-                        }
-                    </div>`;
+                const p = doc.data();
+                grid.innerHTML += `
+                <div class="card p-3 rounded-[1.5rem] flex flex-col group">
+                    <img src="${p.img}" class="w-full aspect-square object-cover rounded-[1rem] mb-3">
+                    <div class="flex justify-between items-start mb-1 px-1">
+                        <h3 class="font-bold text-sm text-white/90">${p.name}</h3>
+                        <span class="text-blue-500 font-bold text-sm">₱${p.price}</span>
+                    </div>
+                    <p class="text-[10px] text-gray-500 font-bold uppercase px-1 mb-4">Seller: ${p.seller}</p>
+                    <button onclick="openCheckout('${doc.id}')" class="w-full py-2.5 rounded-xl bg-white/5 hover:bg-blue-600 text-white text-[10px] font-black uppercase transition-all">Buy Now</button>
+                </div>`;
             });
         }
 
-        async function confirmReceived(orderId) {
-            const docRef = db.collection('orders').doc(orderId);
-            const snap = await docRef.get();
-            const orderData = snap.data();
+        // --- CHECKOUT & ORDERING ---
+        async function openCheckout(id) {
+            const doc = await db.collection('products').doc(id).get();
+            const p = doc.data();
+            document.getElementById('modal-body').innerHTML = `
+                <h2 class="text-xl font-bold text-white mb-6 uppercase">${p.name}</h2>
+                <div class="space-y-4">
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="bg-white/5 p-4 rounded-2xl">
+                            <label class="text-[9px] text-gray-500 uppercase font-black block">Quantity</label>
+                            <input type="number" id="buyQty" value="1" min="1" max="${p.stock}" class="bg-transparent text-white font-bold outline-none w-full">
+                        </div>
+                        <div class="bg-blue-600/10 p-4 rounded-2xl">
+                            <label class="text-[9px] text-blue-500 uppercase font-black block">Price</label>
+                            <div class="text-white font-black">₱${p.price}</div>
+                        </div>
+                    </div>
+                    <input type="text" id="orderLoc" placeholder="Meetup Location (e.g. Canteen)" class="w-full bg-white/5 border border-white/10 p-4 rounded-xl text-white text-sm outline-none">
+                    <button onclick="confirmOrder('${id}')" class="w-full btn-action py-4 uppercase text-[11px]">Confirm Purchase</button>
+                </div>`;
+            document.getElementById('modal').style.display = 'flex';
+        }
 
-            // Move to History Collection
-            await db.collection('history').add({
-                ...orderData,
-                status: 'Completed',
-                completedAt: new Date().toLocaleDateString()
+        async function confirmOrder(pId) {
+            const qty = parseInt(document.getElementById('buyQty').value);
+            const loc = document.getElementById('orderLoc').value;
+            if(!loc) return alert("Enter location.");
+
+            const pRef = db.collection('products').doc(pId);
+            const pDoc = await pRef.get();
+            const p = pDoc.data();
+
+            await db.collection('orders').add({
+                productId: pId, itemName: p.name, itemImg: p.img, price: p.price,
+                quantity: qty, total: p.price * qty, seller: p.seller,
+                buyer: currentUser.username, location: loc, status: 'Pending', date: new Date().toLocaleDateString()
             });
 
-            // Delete from active orders
-            await docRef.delete();
-            alert("Order completed! Moved to History.");
+            await pRef.update({ stock: p.stock - qty });
+            closeModal();
             renderBuyerOrders();
+        }
+
+        // --- BUYER VIEWS (ORDERS & HISTORY) ---
+        async function renderBuyerOrders() {
+            const container = document.getElementById('main-content');
+            container.innerHTML = `<button onclick="renderBuyerShop()" class="text-blue-500 mb-6 text-xs font-bold uppercase"><i class="fa fa-arrow-left"></i> Back</button><h2 class="font-bold text-xl mb-6">Active Orders</h2><div id="list" class="space-y-3"></div>`;
+            const snap = await db.collection('orders').where('buyer', '==', currentUser.username).get();
+            const list = document.getElementById('list');
+            snap.forEach(doc => {
+                const o = doc.data();
+                list.innerHTML += `
+                <div class="card p-4 rounded-2xl flex justify-between items-center">
+                    <div class="flex items-center gap-4">
+                        <img src="${o.itemImg}" class="w-12 h-12 rounded-xl object-cover">
+                        <div><p class="font-bold text-white text-sm">${o.itemName} (x${o.quantity})</p><p class="text-[10px] text-gray-500 uppercase">${o.location}</p></div>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <span class="status-pill ${o.status === 'On the Way' ? 'bg-orange-500/10 text-orange-500' : 'bg-blue-500/10 text-blue-500'}">${o.status}</span>
+                        ${o.status === 'On the Way' ? `<button onclick="confirmReceived('${doc.id}')" class="bg-emerald-500 text-white px-4 py-2 rounded-lg text-[9px] font-black uppercase">Received</button>` : ''}
+                    </div>
+                </div>`;
+            });
+        }
+
+        async function confirmReceived(id) {
+            const ref = db.collection('orders').doc(id);
+            const snap = await ref.get();
+            const data = snap.data();
+            await db.collection('history').add({ ...data, status: 'Completed', completedAt: new Date().toLocaleDateString() });
+            await ref.delete();
+            renderBuyerHistory();
         }
 
         async function renderBuyerHistory() {
             const container = document.getElementById('main-content');
-            container.innerHTML = `
-                <div class="flex items-center gap-4 mb-6">
-                    <button onclick="renderBuyerOrders()" class="text-blue-500"><i class="fa fa-arrow-left"></i></button>
-                    <h2 class="font-bold">Purchase Archive</h2>
-                </div>
-                <div id="history-list" class="grid md:grid-cols-2 gap-4"></div>`;
-            
+            container.innerHTML = `<button onclick="renderBuyerShop()" class="text-blue-500 mb-6 text-xs font-bold uppercase"><i class="fa fa-arrow-left"></i> Back</button><h2 class="font-bold text-xl mb-6">Purchase Archive</h2><div id="list" class="grid md:grid-cols-2 gap-4"></div>`;
             const snap = await db.collection('history').where('buyer', '==', currentUser.username).get();
-            const list = document.getElementById('history-list');
-
             snap.forEach(doc => {
                 const h = doc.data();
-                list.innerHTML += `
-                    <div class="card p-5 rounded-2xl border-l-4 border-emerald-500">
-                        <div class="flex justify-between items-center">
-                            <div><p class="font-bold text-sm text-white">${h.itemName}</p><p class="text-[9px] text-gray-500 font-bold uppercase">Closed ${h.completedAt}</p></div>
-                            <p class="text-emerald-500 font-black">₱${h.total}</p>
-                        </div>
-                    </div>`;
+                document.getElementById('list').innerHTML += `
+                <div class="card p-5 rounded-2xl border-l-4 border-emerald-500 flex justify-between">
+                    <div><p class="font-bold text-white">${h.itemName}</p><p class="text-[10px] text-gray-500">Completed: ${h.completedAt}</p></div>
+                    <p class="text-emerald-500 font-black">₱${h.total}</p>
+                </div>`;
             });
         }
 
-        // --- SELLER REVENUE & HISTORY ---
+        // --- SELLER HUB (CATEGORIZED INVENTORY & SALES) ---
         async function renderSellerHub() {
-            // ... (Your existing Seller Hub UI code here) ...
-            // Add this button to the Seller Hub UI to view revenue:
-            // <button onclick="renderSalesHistory()" class="text-[10px] text-blue-500 font-bold uppercase">View Revenue Report</button>
+            const container = document.getElementById('main-content');
+            container.innerHTML = `
+                <div class="flex justify-between items-center mb-10">
+                    <div><h1 class="text-2xl font-bold">Seller Hub</h1><p class="text-[11px] text-blue-500 font-bold uppercase tracking-widest">Store Management</p></div>
+                    <button onclick="openCreateForm()" class="btn-action px-6 py-2.5 text-[11px] uppercase">List Item</button>
+                </div>
+                <div class="grid lg:grid-cols-3 gap-8">
+                    <div class="lg:col-span-2">
+                        <div class="flex justify-between mb-4">
+                            <h3 class="text-[10px] font-black text-gray-500 uppercase">Incoming Requests</h3>
+                            <button onclick="renderSalesHistory()" class="text-[10px] text-blue-500 font-bold uppercase">View Revenue</button>
+                        </div>
+                        <div id="requests" class="space-y-3"></div>
+                    </div>
+                    <div>
+                        <h3 class="text-[10px] font-black text-gray-500 uppercase mb-4">My Inventory</h3>
+                        <div id="inventory" class="card rounded-2xl divide-y divide-white/5"></div>
+                    </div>
+                </div>`;
+
+            // Inventory (Categorized)
+            const pSnap = await db.collection('products').where('seller', '==', currentUser.username).get();
+            pSnap.forEach(doc => {
+                const p = doc.data();
+                document.getElementById('inventory').innerHTML += `
+                <div class="p-4 flex justify-between items-center">
+                    <div><p class="text-xs font-bold text-white uppercase">${p.name}</p><p class="text-[10px] text-blue-500">₱${p.price}</p></div>
+                    <span class="text-[9px] font-black bg-blue-500/10 px-2 py-1 rounded text-blue-400">STOCK: ${p.stock}</span>
+                </div>`;
+            });
+
+            // Requests
+            const oSnap = await db.collection('orders').where('seller', '==', currentUser.username).get();
+            oSnap.forEach(doc => {
+                const o = doc.data();
+                document.getElementById('requests').innerHTML += `
+                <div class="card p-4 flex justify-between items-center">
+                    <div><p class="font-bold text-sm text-white uppercase">${o.itemName} (x${o.quantity})</p><p class="text-[9px] text-gray-500 uppercase">${o.buyer} @ ${o.location}</p></div>
+                    <button onclick="shipOrder('${doc.id}')" class="text-[9px] font-black uppercase px-4 py-2 rounded-lg bg-orange-500/10 text-orange-500 hover:bg-orange-500 hover:text-white transition" ${o.status === 'On the Way' ? 'disabled' : ''}>
+                        ${o.status === 'Pending' ? 'Ship Item' : 'Shipped'}
+                    </button>
+                </div>`;
+            });
+        }
+
+        async function shipOrder(id) {
+            await db.collection('orders').doc(id).update({ status: 'On the Way' });
+            renderSellerHub();
         }
 
         async function renderSalesHistory() {
             const container = document.getElementById('main-content');
             const snap = await db.collection('history').where('seller', '==', currentUser.username).get();
-            
-            let totalRevenue = 0;
-            let salesHtml = "";
-
+            let total = 0;
+            let listHtml = "";
             snap.forEach(doc => {
                 const h = doc.data();
-                totalRevenue += h.total;
-                salesHtml += `
-                    <div class="card p-4 rounded-xl flex justify-between items-center">
-                        <div><p class="font-bold text-sm text-white uppercase">${h.itemName} (x${h.quantity})</p>
-                        <p class="text-[9px] text-gray-500 font-bold uppercase">To ${h.buyer} on ${h.completedAt}</p></div>
-                        <p class="font-bold text-emerald-500">+₱${h.total}</p>
-                    </div>`;
+                total += h.total;
+                listHtml += `<div class="card p-4 flex justify-between items-center"><div><p class="font-bold text-white uppercase text-sm">${h.itemName}</p><p class="text-[9px] text-gray-500 uppercase">To ${h.buyer} on ${h.completedAt}</p></div><p class="text-emerald-500 font-bold">+₱${h.total}</p></div>`;
             });
-
             container.innerHTML = `
-                <div class="flex items-center gap-4 mb-8">
-                    <button onclick="renderSellerHub()" class="w-9 h-9 flex items-center justify-center rounded-xl bg-white/5"><i class="fa fa-arrow-left"></i></button>
-                    <h2 class="text-xl font-bold uppercase">Revenue Report</h2>
+                <button onclick="renderSellerHub()" class="mb-6 text-xs text-blue-500 font-bold uppercase"><i class="fa fa-arrow-left"></i> Hub</button>
+                <div class="card p-8 rounded-[2rem] bg-emerald-500/5 text-center mb-8">
+                    <p class="text-[10px] text-gray-500 uppercase font-black">Total Earnings</p>
+                    <p class="text-4xl font-extrabold text-emerald-500 tracking-tighter">₱${total.toLocaleString()}</p>
                 </div>
-                <div class="card p-8 rounded-[2rem] mb-8 bg-emerald-500/5 border-emerald-500/10 text-center">
-                    <p class="text-[10px] text-gray-500 uppercase font-black tracking-widest mb-1">Total Lifetime Earnings</p>
-                    <p class="text-4xl font-extrabold text-emerald-500 tracking-tighter">₱${totalRevenue.toLocaleString()}</p>
-                </div>
-                <div class="space-y-3">${salesHtml || '<p class="text-gray-500 text-center">No sales yet.</p>'}</div>`;
+                <div class="space-y-3">${listHtml}</div>`;
         }
-        
-        // ... (Rest of your helper functions: renderBuyerShop, logout, etc.) ...
+
+        // --- CREATE PRODUCT ---
+        function openCreateForm() {
+            document.getElementById('modal-body').innerHTML = `
+                <h2 class="text-xl font-bold text-white mb-6 uppercase">New Listing</h2>
+                <div class="space-y-4">
+                    <input type="text" id="newName" placeholder="Product Name" class="w-full bg-white/5 border border-white/10 p-4 rounded-xl text-white text-sm outline-none">
+                    <div class="grid grid-cols-2 gap-4">
+                        <input type="number" id="newPrice" placeholder="Price (₱)" class="w-full bg-white/5 border border-white/10 p-4 rounded-xl text-white text-sm outline-none">
+                        <input type="number" id="newStock" placeholder="Stock" class="w-full bg-white/5 border border-white/10 p-4 rounded-xl text-white text-sm outline-none">
+                    </div>
+                    <input type="file" id="newImg" accept="image/*" class="text-[10px] text-gray-400">
+                    <button onclick="processProduct()" class="w-full btn-action py-4 uppercase text-[11px]">Post to Bazaar</button>
+                </div>`;
+            document.getElementById('modal').style.display = 'flex';
+        }
+
+        async function processProduct() {
+            const n = document.getElementById('newName').value, p = document.getElementById('newPrice').value, s = document.getElementById('newStock').value, f = document.getElementById('newImg').files[0];
+            if(!n || !f) return alert("All fields required.");
+            const r = new FileReader(); r.onload = async (e) => {
+                await db.collection('products').add({ name: n, price: parseFloat(p), stock: parseInt(s), img: e.target.result, seller: currentUser.username });
+                closeModal(); renderSellerHub();
+            }; r.readAsDataURL(f);
+        }
+
+        function closeModal() { document.getElementById('modal').style.display = 'none'; }
     </script>
 </body>
 </html>
